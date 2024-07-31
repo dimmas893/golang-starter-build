@@ -1,12 +1,23 @@
 package helper
 
 import (
+	"encoding/json"
 	"math"
 	"net/http"
 	"strconv"
 )
 
 type Pagination struct {
+	Items       interface{} `json:"items"`
+	CurrentPage int         `json:"current_page"`
+	LastPage    int         `json:"last_page"`
+	PerPage     int         `json:"per_page"`
+	Total       int         `json:"total"`
+}
+
+type PaginatedResponse struct {
+	Status      string      `json:"status"`
+	Message     string      `json:"message"`
 	Items       interface{} `json:"items"`
 	CurrentPage int         `json:"current_page"`
 	LastPage    int         `json:"last_page"`
@@ -44,4 +55,21 @@ func Paginate(r *http.Request, data []map[string]interface{}, itemsPerPage int) 
 	}
 
 	return pagination
+}
+
+func ResponsePaginatedJSON(w http.ResponseWriter, code int, message string, pagination *Pagination) {
+	response := PaginatedResponse{
+		Status:      "success",
+		Message:     message,
+		Items:       pagination.Items,
+		CurrentPage: pagination.CurrentPage,
+		LastPage:    pagination.LastPage,
+		PerPage:     pagination.PerPage,
+		Total:       pagination.Total,
+	}
+
+	jsonResponse, _ := json.Marshal(response)
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(code)
+	w.Write(jsonResponse)
 }
