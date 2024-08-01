@@ -1,0 +1,2 @@
+ERROR 2024/08/01 12:37:36 log_helper.go:51: An error occurred map[error_class:error error_message:an example error trace_file:/var/www/html/golang/go-jwt-mux/controllers/usercontroller/usercontroller.go trace_line:14]
+ERROR 2024/08/01 12:37:49 log_helper.go:51: An error occurred map[error_class:error error_message:an example error trace_file:/var/www/html/golang/go-jwt-mux/controllers/usercontroller/usercontroller.go trace_line:14]
