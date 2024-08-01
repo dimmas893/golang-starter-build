@@ -133,6 +133,8 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	context := helper.LogContext(data)
+	helper.Info(helper.GENERAL, "log data user", context)
 	// Create pagination response
 	pagination := helper.CreatePagination(r, data, perPage, totalRecords)
 
