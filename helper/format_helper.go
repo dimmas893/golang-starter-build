@@ -5,22 +5,26 @@ import (
 	"net/http"
 )
 
+// LogContext formats the context for logging
 func LogContext(data interface{}) map[string]interface{} {
-	if err, ok := data.(error); ok {
+	switch v := data.(type) {
+	case error:
 		return map[string]interface{}{
 			"error_class":   "error",
-			"error_message": err.Error(),
+			"error_message": v.Error(),
 		}
-	}
-
-	if resp, ok := data.(*http.Response); ok {
+	case *http.Response:
 		return map[string]interface{}{
-			"response_status": resp.StatusCode,
-			"response_body":   resp.Body,
+			"response_status": v.StatusCode,
+			"response_body":   v.Body,
 		}
-	}
-
-	return map[string]interface{}{
-		"unknown_type": errors.New("unknown data type"),
+	case []map[string]interface{}:
+		return map[string]interface{}{
+			"response_data": v,
+		}
+	default:
+		return map[string]interface{}{
+			"unknown_type": errors.New("unknown data type"),
+		}
 	}
 }

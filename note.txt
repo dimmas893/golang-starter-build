@@ -1,3 +1,6 @@
 #log
 context := helper.LogContext(fmt.Errorf("an example error"))
 helper.Error(helper.GENERAL, "An error occurred", context)
+
+	context := helper.LogContext(pagination)
+	helper.Error(helper.GENERAL, "An error occurred", context)

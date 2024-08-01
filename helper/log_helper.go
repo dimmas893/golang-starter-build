@@ -9,15 +9,8 @@ import (
 )
 
 const (
-	DISBURSEMENT        = "disbursement"
-	KREDIBLE            = "kredible"
-	MANUAL_DISBURSEMENT = "manual-disbursement"
-	DEPOSIT             = "deposit"
-	GENERAL             = "general"
-	MERCHANT_REQUEST    = "merchant-request"
-	DASHBOARD           = "dashboard"
-	SCHEDULER           = "scheduler"
-	VENDOR_REQUEST      = "vendor-request"
+	LOGGING = "logging"
+	GENERAL = "general"
 )
 
 func logMessage(level, path, message string, context map[string]interface{}) {
