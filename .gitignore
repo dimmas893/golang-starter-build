@@ -1,0 +1,14 @@
+# Ignore everything
+# *
+
+# Don't ignore directories
+# !*/
+
+# Don't ignore the logs directory
+# !logs/
+
+# Ignore everything inside the logs directory
+logs/*
+
+# Don't ignore the .gitignore file itself
+# !.gitignore

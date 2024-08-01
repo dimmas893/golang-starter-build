@@ -12,13 +12,16 @@ import (
 )
 
 func main() {
-	config.InitRedis() // Inisialisasi Redis
-	models.ConnectDatabase()
-	r := routes.SetupRouter()
-
+	// Load environment variables from .env file
 	if err := godotenv.Load(); err != nil {
 		log.Fatalf("Error loading .env file: %v", err)
 	}
+
+	config.InitRedis() // Initialize Redis
+	models.ConnectDatabase()
+
+	// Set up router
+	r := routes.SetupRouter()
 
 	// Get port from environment variable, default to 8081 if not set
 	port := os.Getenv("PORT")
