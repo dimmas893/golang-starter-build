@@ -4,6 +4,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
+// SetupRouter mengatur semua rute
 func SetupRouter() *mux.Router {
 	r := mux.NewRouter()
 
@@ -13,7 +14,10 @@ func SetupRouter() *mux.Router {
 	// Setup rute untuk produk
 	SetupProductRouter(r)
 
+	// Setup rute untuk pengguna
 	SetupUserRouter(r)
+
+	SetupSecurityRoutes(r)
 
 	return r
 }
