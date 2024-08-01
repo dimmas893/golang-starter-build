@@ -9,6 +9,6 @@
 
 # Ignore everything inside the logs directory
 logs/*
-
+.env
 # Don't ignore the .gitignore file itself
 # !.gitignore
