@@ -17,63 +17,50 @@ var mutex sync.Mutex
 // JWTMiddleware adalah middleware untuk memvalidasi token JWT pada setiap permintaan
 func JWTMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Mengambil token dari header "signature"
 		tokenString := r.Header.Get("signature")
 		if tokenString == "" {
-			// Jika token tidak ditemukan, kirim respon Unauthorized
-			helper.Unauthorized(w, "Unauthorized", "Token tidak ditemukan")
+			helper.GenerateErrorResponse(w, helper.UNAUTHORIZED, "Token tidak ditemukan", nil)
 			return
 		}
 
-		// Memeriksa apakah token ada di Redis
 		if IsBlacklisted(tokenString) {
-			helper.Unauthorized(w, "Unauthorized", "Token tidak valid")
+			helper.GenerateErrorResponse(w, helper.UNAUTHORIZED, "Token tidak valid", nil)
 			return
 		}
 
 		claims := &config.JWTClaim{}
-
-		// Mem-parsing token dan memvalidasi klaimnya
 		token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
 			return config.JWT_KEY, nil
 		})
 
 		if err != nil {
-			// Jika ada error saat parsing token, periksa jenis errornya
 			v, _ := err.(*jwt.ValidationError)
 			switch v.Errors {
 			case jwt.ValidationErrorSignatureInvalid:
-				// Token tidak valid (signature tidak valid)
-				helper.Unauthorized(w, "Unauthorized", "Token tidak valid")
+				helper.GenerateErrorResponse(w, helper.UNAUTHORIZED, "Token tidak valid", nil)
 				return
 			case jwt.ValidationErrorExpired:
-				// Token telah kadaluarsa
-				helper.Unauthorized(w, "Unauthorized", "Token telah kadaluarsa")
+				helper.GenerateErrorResponse(w, helper.UNAUTHORIZED, "Token telah kadaluarsa", nil)
 				return
 			default:
-				// Token tidak valid untuk alasan lainnya
-				helper.Unauthorized(w, "Unauthorized", "Token tidak valid")
+				helper.GenerateErrorResponse(w, helper.UNAUTHORIZED, "Token tidak valid", nil)
 				return
 			}
 		}
 
 		if !token.Valid {
-			// Jika token tidak valid
-			helper.Unauthorized(w, "Unauthorized", "Token tidak valid")
+			helper.GenerateErrorResponse(w, helper.UNAUTHORIZED, "Token tidak valid", nil)
 			return
 		}
 
-		// Reset durasi token menggunakan helper
 		newTokenString, err := helper.CreateJWTToken(claims.Username, 1*time.Minute)
 		if err != nil {
-			helper.InternalServerError(w, "Token Creation Error", err.Error())
+			helper.GenerateErrorResponse(w, helper.SERVER_GENERAL_ERROR, "Token Creation Error", err.Error())
 			return
 		}
 
-		// Set header status token dan token baru
-		w.Header().Set("signature", newTokenString) // Replace token lama dengan token baru di header signature
-
-		next.ServeHTTP(w, r) // Lanjutkan ke handler berikutnya
+		w.Header().Set("signature", newTokenString)
+		next.ServeHTTP(w, r)
 	})
 }
 
@@ -83,7 +70,6 @@ func IsBlacklisted(token string) bool {
 	if err == redis.Nil {
 		return false
 	} else if err != nil {
-		// Tangani kesalahan Redis di sini
 		return false
 	}
 	return result == "blacklisted"

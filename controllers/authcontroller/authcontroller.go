@@ -22,7 +22,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&userInput); err != nil {
 		// Jika ada error saat decode, kirim response error
-		helper.ResponseError(w, http.StatusBadRequest, "Invalid input", err.Error())
+		helper.GenerateErrorResponse(w, helper.INVALID_FIELD_FORMAT, err.Error(), nil)
 		return
 	}
 	defer r.Body.Close()
@@ -33,18 +33,18 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	if err := models.DB.Where("username = ?", userInput.Username).First(&user).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			// Jika user tidak ditemukan
-			helper.ResponseError(w, http.StatusUnauthorized, "Invalid credentials", "Username or password is incorrect")
+			helper.GenerateErrorResponse(w, helper.LOGIN_FAILED, err.Error(), nil)
 			return
 		}
 		// Jika ada error lain saat akses database
-		helper.ResponseError(w, http.StatusInternalServerError, "Database error", err.Error())
+		helper.GenerateErrorResponse(w, helper.SERVER_GENERAL_ERROR, err.Error(), nil)
 		return
 	}
 
 	// Cek password yang diinput oleh user dengan password yang tersimpan di database
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(userInput.Password)); err != nil {
 		// Jika password tidak cocok
-		helper.ResponseError(w, http.StatusUnauthorized, "Invalid credentials", "Username or password is incorrect")
+		helper.GenerateErrorResponse(w, helper.LOGIN_FAILED, err.Error(), nil)
 		return
 	}
 
@@ -52,7 +52,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	token, err := helper.CreateJWTToken(user.Username, 1*time.Minute) // Menggunakan helper untuk membuat token dengan durasi 1 menit
 	if err != nil {
 		// Jika ada error saat membuat token
-		helper.ResponseError(w, http.StatusInternalServerError, "Token generation error", err.Error())
+		helper.GenerateErrorResponse(w, helper.SERVER_GENERAL_ERROR, "Token generation error", err.Error())
 		return
 	}
 
@@ -65,7 +65,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	})
 
 	// Kirim response sukses dengan token yang dihasilkan
-	helper.ResponseJSON(w, http.StatusOK, "Login successful", map[string]string{"token": token})
+	helper.GenerateResponse(w, helper.OK, map[string]string{"token": token})
 }
 
 // Register adalah fungsi untuk proses registrasi pengguna baru
@@ -76,7 +76,7 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(&userInput); err != nil {
 		// Jika ada error saat decode, kirim response error
-		helper.ResponseError(w, http.StatusBadRequest, "Invalid input", err.Error())
+		helper.GenerateErrorResponse(w, helper.INVALID_FIELD_FORMAT, err.Error(), nil)
 		return
 	}
 	defer r.Body.Close()
@@ -87,13 +87,13 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	// Cek apakah username sudah ada di database
 	if err = models.DB.Where("username = ?", userInput.Username).First(&user).Error; err == nil {
 		// Jika username sudah ada
-		helper.ResponseError(w, http.StatusConflict, "Conflict", "Username sudah ada")
+		helper.GenerateErrorResponse(w, helper.INVALID_FIELD_FORMAT, "Username sudah ada", nil)
 		return
 	}
 
 	// Jika ada error lain selain ErrRecordNotFound saat mengakses database
 	if err != nil && err != gorm.ErrRecordNotFound {
-		helper.ResponseError(w, http.StatusInternalServerError, "Database error", err.Error())
+		helper.GenerateErrorResponse(w, helper.SERVER_GENERAL_ERROR, err.Error(), nil)
 		return
 	}
 
@@ -104,12 +104,12 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	// Simpan user baru ke database
 	if err = models.DB.Create(&userInput).Error; err != nil {
 		// Jika ada error saat menyimpan user baru ke database
-		helper.ResponseError(w, http.StatusInternalServerError, "Database error", err.Error())
+		helper.GenerateErrorResponse(w, helper.SERVER_GENERAL_ERROR, err.Error(), nil)
 		return
 	}
 
 	// Kirim response sukses
-	helper.ResponseJSON(w, http.StatusOK, "Registration successful", nil)
+	helper.GenerateResponse(w, helper.OK, nil)
 }
 
 // Logout adalah fungsi untuk proses logout pengguna
@@ -118,7 +118,7 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 	tokenString := r.Header.Get("signature")
 	if tokenString == "" {
 		// Jika signature tidak ditemukan, kirim respon
-		helper.ResponseError(w, http.StatusBadRequest, "Invalid request", "signature tidak ditemukan")
+		helper.GenerateErrorResponse(w, helper.UNAUTHORIZED, "Token tidak ditemukan", nil)
 		return
 	}
 
@@ -130,13 +130,13 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil || !token.Valid {
 		// Jika token tidak valid atau ada kesalahan saat parsing token
-		helper.ResponseError(w, http.StatusBadRequest, "Invalid request", "signature tidak ditemukan")
+		helper.GenerateErrorResponse(w, helper.UNAUTHORIZED, "Token tidak valid", nil)
 		return
 	}
 
 	// Cek apakah token sudah ada di Redis
 	if middleware.IsBlacklisted(tokenString) {
-		helper.ResponseJSON(w, http.StatusOK, "Logout successful", "Anda sudah logout")
+		helper.GenerateResponse(w, helper.OK, "Anda sudah logout")
 		return
 	}
 
@@ -153,5 +153,5 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 	})
 
 	// Kirim response sukses
-	helper.ResponseJSON(w, http.StatusOK, "Logout successful", "Logout berhasil")
+	helper.GenerateResponse(w, helper.OK, "Logout berhasil")
 }

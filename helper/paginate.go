@@ -12,20 +12,20 @@ type Pagination struct {
 	CurrentPage int         `json:"current_page"`
 	LastPage    int         `json:"last_page"`
 	PerPage     int         `json:"per_page"`
-	Total       int         `json:"total"`
+	Total       int64       `json:"total"`
 }
 
 type PaginatedResponse struct {
-	Status      string      `json:"status"`
-	Message     string      `json:"message"`
-	Items       interface{} `json:"items"`
-	CurrentPage int         `json:"current_page"`
-	LastPage    int         `json:"last_page"`
-	PerPage     int         `json:"per_page"`
-	Total       int         `json:"total"`
+	ResponseCode    string      `json:"response_code"`
+	ResponseMessage string      `json:"response_message"`
+	Items           interface{} `json:"items"`
+	CurrentPage     int         `json:"current_page"`
+	LastPage        int         `json:"last_page"`
+	PerPage         int         `json:"per_page"`
+	Total           int64       `json:"total"`
 }
 
-func Paginate(r *http.Request, data []map[string]interface{}, itemsPerPage int) *Pagination {
+func CreatePagination(r *http.Request, data []map[string]interface{}, itemsPerPage int, totalItems int64) *Pagination {
 	pageStr := r.URL.Query().Get("page")
 	if pageStr == "" {
 		pageStr = "1"
@@ -35,41 +35,31 @@ func Paginate(r *http.Request, data []map[string]interface{}, itemsPerPage int) 
 		page = 1
 	}
 
-	totalItems := len(data)
 	totalPages := int(math.Ceil(float64(totalItems) / float64(itemsPerPage)))
 
-	startIndex := (page - 1) * itemsPerPage
-	endIndex := startIndex + itemsPerPage
-	if endIndex > totalItems {
-		endIndex = totalItems
-	}
-
-	paginatedData := data[startIndex:endIndex]
-
-	pagination := &Pagination{
-		Items:       paginatedData,
+	return &Pagination{
+		Items:       data,
 		Total:       totalItems,
 		CurrentPage: page,
 		LastPage:    totalPages,
 		PerPage:     itemsPerPage,
 	}
-
-	return pagination
 }
 
-func ResponsePaginatedJSON(w http.ResponseWriter, code int, message string, pagination *Pagination) {
+func ResponsePaginatedJSON(w http.ResponseWriter, code ResponseCode, message string, pagination *Pagination) {
 	response := PaginatedResponse{
-		Status:      "success",
-		Message:     message,
-		Items:       pagination.Items,
-		CurrentPage: pagination.CurrentPage,
-		LastPage:    pagination.LastPage,
-		PerPage:     pagination.PerPage,
-		Total:       pagination.Total,
+		ResponseCode:    string(code),
+		ResponseMessage: code.Message(),
+		Items:           pagination.Items,
+		CurrentPage:     pagination.CurrentPage,
+		LastPage:        pagination.LastPage,
+		PerPage:         pagination.PerPage,
+		Total:           pagination.Total,
 	}
 
 	jsonResponse, _ := json.Marshal(response)
 	w.Header().Add("Content-Type", "application/json")
-	w.WriteHeader(code)
+	statusCode, _ := strconv.Atoi(string(code)[:3])
+	w.WriteHeader(statusCode)
 	w.Write(jsonResponse)
 }

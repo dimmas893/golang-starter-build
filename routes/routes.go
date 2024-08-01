@@ -13,5 +13,7 @@ func SetupRouter() *mux.Router {
 	// Setup rute untuk produk
 	SetupProductRouter(r)
 
+	SetupUserRouter(r)
+
 	return r
 }

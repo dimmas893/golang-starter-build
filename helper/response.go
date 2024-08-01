@@ -5,8 +5,8 @@ import (
 	"net/http"
 )
 
-// Response structure for success
-type Response struct {
+// SuccessResponse structure for success
+type SuccessResponse struct {
 	Status  string      `json:"status"`
 	Message string      `json:"message"`
 	Items   interface{} `json:"items,omitempty"`
@@ -14,7 +14,7 @@ type Response struct {
 
 // ResponseJSON sends a standard JSON response
 func ResponseJSON(w http.ResponseWriter, code int, message string, data interface{}) {
-	response := Response{
+	response := SuccessResponse{
 		Status:  "success",
 		Message: message,
 		Items:   data,

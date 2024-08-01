@@ -2,6 +2,7 @@ package productcontroller
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/jeypc/go-jwt-mux/helper"
 )
@@ -58,8 +59,31 @@ func Index(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	itemsPerPage := 5
-	pagination := helper.Paginate(r, data, itemsPerPage)
+	// Read pagination parameters from the request
+	perPageStr := r.URL.Query().Get("per_page")
+	pageStr := r.URL.Query().Get("page")
 
-	helper.ResponsePaginatedJSON(w, http.StatusOK, "Data produk berhasil diambil", pagination)
+	perPage, err := strconv.Atoi(perPageStr)
+	if err != nil || perPage <= 0 {
+		perPage = 5 // Default items per page
+	}
+
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page <= 0 {
+		page = 1 // Default page number
+	}
+
+	// Paginate the data
+	pagination := helper.CreatePagination(r, data, perPage, int64(len(data)))
+
+	// Slice the data for the current page
+	startIndex := (page - 1) * perPage
+	endIndex := startIndex + perPage
+	if endIndex > len(data) {
+		endIndex = len(data)
+	}
+	pagination.Items = data[startIndex:endIndex]
+
+	helper.ResponsePaginatedJSON(w, helper.OK, "Data produk berhasil diambil", pagination)
+	// helper.PaginateResponse(w, helper.OK, *pagination)
 }
