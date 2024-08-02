@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8081:8081"
+    environment:
+      DB_USERNAME: anam8747_kasir
+      DB_PASSWORD: anam8747_kasir
+      DB_HOST: 103.247.10.164
+      DB_PORT: 3306
+      DB_NAME: anam8747_kasir
+      PORT: 8081
