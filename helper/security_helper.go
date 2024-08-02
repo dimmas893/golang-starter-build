@@ -13,6 +13,7 @@ import (
 	"encoding/base64"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -21,6 +22,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // GenerateAsymmetricKey generates RSA key pair
@@ -130,7 +132,14 @@ func VerifySymmetricSignature(data, key, signature string) bool {
 	return hmac.Equal([]byte(expectedSignature), []byte(signature))
 }
 
-// SaveKeyToFile saves a key to a specified file
+func HashSecret(secret string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(secret), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hash), nil
+}
+
 func SaveKeyToFile(key, path string) error {
 	err := os.MkdirAll(filepath.Dir(path), os.ModePerm)
 	if err != nil {
@@ -139,31 +148,45 @@ func SaveKeyToFile(key, path string) error {
 
 	return ioutil.WriteFile(path, []byte(key), 0644)
 }
+func SaveCredentials(privateKey, publicKey, secret string) (string, error) {
+	privateKeyPath := filepath.Join("logs", "credentials", secret, "private.key")
+	publicKeyPath := filepath.Join("logs", "credentials", secret, "public.key")
+	secretKeyPath := filepath.Join("logs", "credentials", secret, "secret.key")
 
-// SaveCredentials saves the private and public keys to respective files
-func SaveCredentials(privateKey, publicKey, uniqueName string) error {
-	privateKeyPath := filepath.Join("logs", "credentials", uniqueName, "private.key")
-	publicKeyPath := filepath.Join("logs", "credentials", uniqueName, "public.key")
-
-	err := SaveKeyToFile(privateKey, privateKeyPath)
+	hashedSecret, err := HashSecret(secret)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return SaveKeyToFile(publicKey, publicKeyPath)
+	err = SaveKeyToFile(privateKey, privateKeyPath)
+	if err != nil {
+		return "", err
+	}
+
+	err = SaveKeyToFile(publicKey, publicKeyPath)
+	if err != nil {
+		return "", err
+	}
+
+	err = SaveKeyToFile(hashedSecret, secretKeyPath)
+	if err != nil {
+		return "", err
+	}
+
+	return hashedSecret, nil
 }
 
-// GenerateAccessToken generates a JWT token
-func GenerateAccessToken(subject, audience string, lifetime int) (string, error) {
+// GenerateAccessToken generates a JWT token with the secret included as a claim
+func GenerateAccessToken(apiKey, secret, audience string, lifetime int) (string, error) {
 	now := time.Now()
-	claims := jwt.StandardClaims{
-		Issuer:    "your_app_url",
-		Subject:   subject,
-		Audience:  audience,
-		ExpiresAt: now.Add(time.Duration(lifetime) * time.Second).Unix(),
-		NotBefore: now.Unix(),
-		IssuedAt:  now.Unix(),
-		Id:        uuid.NewString(),
+	claims := jwt.MapClaims{
+		"iss":    apiKey,
+		"aud":    audience,
+		"exp":    now.Add(time.Duration(lifetime) * time.Second).Unix(),
+		"nbf":    now.Unix(),
+		"iat":    now.Unix(),
+		"jti":    uuid.NewString(),
+		"secret": secret, // Include the secret in the claims
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -186,6 +209,49 @@ func VerifyAccessToken(tokenStr string) (*jwt.StandardClaims, error) {
 	}
 }
 
+// ValidateSecret memeriksa apakah secret yang diberikan cocok dengan secret yang tersimpan di file
+func ValidateSecret(apiKey, secret string) bool {
+	// Membuat path lengkap untuk file secret.key berdasarkan apiKey yang diberikan
+	secretKeyPath := filepath.Join("logs", "credentials", apiKey, "secret.key")
+
+	// Log path untuk debug
+	fmt.Printf("Secret key path: %s\n", secretKeyPath)
+
+	// Membaca konten dari file secret.key
+	storedSecret, err := ioutil.ReadFile(secretKeyPath)
+	if err != nil {
+		// Log error untuk debug
+		fmt.Printf("Error reading secret key file: %v\n", err)
+		// Jika terjadi kesalahan saat membaca file, kembalikan false
+		return false
+	}
+
+	// Log secret yang tersimpan untuk debug
+	fmt.Printf("Stored secret: %s\n", storedSecret)
+	// Log secret yang diberikan untuk debug
+	fmt.Printf("Provided secret: %s\n", secret)
+
+	// Cek jika storedSecret dan providedSecret sama secara langsung
+	if string(storedSecret) == secret {
+		// Jika sama, lanjutkan validasi dengan bcrypt
+		fmt.Println("Secrets are directly equal, skipping bcrypt comparison.")
+		return true
+	}
+
+	// Membandingkan secret yang diberikan dengan secret yang tersimpan menggunakan bcrypt
+	// bcrypt.CompareHashAndPassword mengembalikan nil jika secret cocok
+	err = bcrypt.CompareHashAndPassword(storedSecret, []byte(secret))
+	if err != nil {
+		// Log error untuk debug
+		fmt.Printf("Error comparing secret: %v\n", err)
+		// Jika secret tidak cocok, kembalikan false
+		return false
+	}
+
+	// Jika secret cocok, kembalikan true
+	return true
+}
+
 // StoreCredential stores an encrypted credential in a file
 func StoreCredential(subject, filename, content, apiKey string) error {
 	encryptedContent, err := EncryptString(content)
@@ -197,20 +263,28 @@ func StoreCredential(subject, filename, content, apiKey string) error {
 	return ioutil.WriteFile(path, []byte(encryptedContent), 0644)
 }
 
-// GetCredential retrieves and decrypts a credential from a file
-func GetCredential(subject, filename, apiKey string) (string, error) {
-	path := filepath.Join("credentials", subject, apiKey, filename)
-	encryptedContent, err := ioutil.ReadFile(path)
+func GetCredential(apiKey, filename string) (string, error) {
+	// Bangun path file credential
+	path := filepath.Join("logs", "credentials", apiKey, filename)
+
+	// Tambahkan log untuk memeriksa path file yang sedang dibaca
+	fmt.Printf("Reading credential from path: %s\n", path)
+
+	// Membaca konten dari file
+	content, err := ioutil.ReadFile(path)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to read file: %w", err)
 	}
 
-	return DecryptString(string(encryptedContent))
+	return string(content), nil
 }
 
-// EncryptString encrypts a string
 func EncryptString(plaintext string) (string, error) {
 	key := []byte(os.Getenv("ENCRYPTION_KEY"))
+	if len(key) != 32 {
+		return "", errors.New("encryption key must be 32 bytes long")
+	}
+
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return "", err
@@ -227,17 +301,22 @@ func EncryptString(plaintext string) (string, error) {
 	}
 
 	ciphertext := gcm.Seal(nonce, nonce, []byte(plaintext), nil)
-	return base64.StdEncoding.EncodeToString(ciphertext), nil
+	encodedCiphertext := base64.StdEncoding.EncodeToString(ciphertext)
+	fmt.Printf("Encrypted and encoded ciphertext: %s\n", encodedCiphertext) // Log untuk debug
+	return encodedCiphertext, nil
 }
 
-// DecryptString decrypts a string
 func DecryptString(ciphertext string) (string, error) {
 	data, err := base64.StdEncoding.DecodeString(ciphertext)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to decode base64: %w", err) // Menambahkan informasi error yang lebih jelas
 	}
 
 	key := []byte(os.Getenv("ENCRYPTION_KEY"))
+	if len(key) != 32 {
+		return "", errors.New("encryption key must be 32 bytes long")
+	}
+
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return "", err
