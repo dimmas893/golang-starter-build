@@ -8,6 +8,6 @@ import (
 func SetupAuthRouter(r *mux.Router) {
 	// Rute untuk login, register, dan logout
 	r.HandleFunc("/login", authcontroller.Login).Methods("POST")
-	r.HandleFunc("/register", authcontroller.Register).Methods("POST")
 	r.HandleFunc("/logout", authcontroller.Logout).Methods("GET")
+	r.HandleFunc("/profile", authcontroller.GetProfile).Methods("GET")
 }

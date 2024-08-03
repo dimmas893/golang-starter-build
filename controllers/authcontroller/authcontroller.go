@@ -68,50 +68,6 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	helper.GenerateResponse(w, helper.OK, map[string]string{"token": token})
 }
 
-// Register adalah fungsi untuk proses registrasi pengguna baru
-func Register(w http.ResponseWriter, r *http.Request) {
-	var userInput models.User
-
-	// Decode JSON input dari request body
-	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(&userInput); err != nil {
-		// Jika ada error saat decode, kirim response error
-		helper.GenerateErrorResponse(w, helper.INVALID_FIELD_FORMAT, err.Error(), nil)
-		return
-	}
-	defer r.Body.Close()
-
-	var user models.User
-	var err error // Deklarasikan err di sini
-
-	// Cek apakah username sudah ada di database
-	if err = models.DB.Where("username = ?", userInput.Username).First(&user).Error; err == nil {
-		// Jika username sudah ada
-		helper.GenerateErrorResponse(w, helper.INVALID_FIELD_FORMAT, "Username sudah ada", nil)
-		return
-	}
-
-	// Jika ada error lain selain ErrRecordNotFound saat mengakses database
-	if err != nil && err != gorm.ErrRecordNotFound {
-		helper.GenerateErrorResponse(w, helper.SERVER_GENERAL_ERROR, err.Error(), nil)
-		return
-	}
-
-	// Hash password sebelum disimpan ke database
-	hashPassword, _ := bcrypt.GenerateFromPassword([]byte(userInput.Password), bcrypt.DefaultCost)
-	userInput.Password = string(hashPassword)
-
-	// Simpan user baru ke database
-	if err = models.DB.Create(&userInput).Error; err != nil {
-		// Jika ada error saat menyimpan user baru ke database
-		helper.GenerateErrorResponse(w, helper.SERVER_GENERAL_ERROR, err.Error(), nil)
-		return
-	}
-
-	// Kirim response sukses
-	helper.GenerateResponse(w, helper.OK, nil)
-}
-
 // Logout adalah fungsi untuk proses logout pengguna
 func Logout(w http.ResponseWriter, r *http.Request) {
 	// Mengambil token dari header "signature"
@@ -154,4 +110,44 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 
 	// Kirim response sukses
 	helper.GenerateResponse(w, helper.OK, "Logout berhasil")
+}
+
+// GetProfile adalah fungsi untuk mendapatkan profil pengguna yang sedang login
+func GetProfile(w http.ResponseWriter, r *http.Request) {
+	// Mengambil token dari cookie
+	cookie, err := r.Cookie("token")
+	if err != nil {
+		helper.GenerateErrorResponse(w, helper.UNAUTHORIZED, "Token tidak ditemukan", nil)
+		return
+	}
+	tokenString := cookie.Value
+
+	// Mem-parsing token untuk memvalidasi dan mengambil klaim
+	claims := &config.JWTClaim{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
+		return config.JWT_KEY, nil
+	})
+
+	if err != nil || !token.Valid {
+		helper.GenerateErrorResponse(w, helper.UNAUTHORIZED, "Token tidak valid", nil)
+		return
+	}
+
+	// Mengambil username dari klaim token
+	username := claims.Username
+
+	var user models.User
+
+	// Cari user di database berdasarkan username
+	if err := models.DB.Where("username = ?", username).First(&user).Error; err != nil {
+		helper.GenerateErrorResponse(w, helper.SERVER_GENERAL_ERROR, "User tidak ditemukan", nil)
+		return
+	}
+
+	// Kirim response sukses dengan data user
+	helper.GenerateResponse(w, helper.OK, map[string]interface{}{
+		"id":           user.Id,
+		"nama_lengkap": user.NamaLengkap,
+		"username":     user.Username,
+	})
 }

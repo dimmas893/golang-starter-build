@@ -1,12 +1,16 @@
 package usercontroller
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 
+	"github.com/gorilla/mux"
 	"github.com/jeypc/go-jwt-mux/helper"
 	"github.com/jeypc/go-jwt-mux/models"
 	"github.com/jeypc/go-jwt-mux/request/userRequest"
+	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 func GetUsers(w http.ResponseWriter, r *http.Request) {
@@ -138,4 +142,111 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 
 	// Return successful paginated response
 	helper.ResponsePaginatedJSON(w, helper.OK, "Data users berhasil diambil", pagination)
+}
+
+// CreateUser handles creating a new user
+func CreateUser(w http.ResponseWriter, r *http.Request) {
+	var userInput models.User
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&userInput); err != nil {
+		helper.GenerateErrorResponse(w, helper.INVALID_FIELD_FORMAT, err.Error(), nil)
+		return
+	}
+	defer r.Body.Close()
+
+	// Hash password before saving
+	hashPassword, _ := bcrypt.GenerateFromPassword([]byte(userInput.Password), bcrypt.DefaultCost)
+	userInput.Password = string(hashPassword)
+
+	if err := models.DB.Create(&userInput).Error; err != nil {
+		helper.GenerateErrorResponse(w, helper.SERVER_GENERAL_ERROR, err.Error(), nil)
+		return
+	}
+
+	helper.GenerateResponse(w, helper.OK, userInput)
+}
+
+// GetUser handles retrieving a user by ID
+func GetUser(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		helper.GenerateErrorResponse(w, helper.INVALID_FIELD_FORMAT, "Invalid ID format", nil)
+		return
+	}
+
+	var user models.User
+	if err := models.DB.First(&user, id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			helper.GenerateErrorResponse(w, helper.SERVER_GENERAL_ERROR, "User not found", nil)
+			return
+		}
+		helper.GenerateErrorResponse(w, helper.SERVER_GENERAL_ERROR, err.Error(), nil)
+		return
+	}
+
+	helper.GenerateResponse(w, helper.OK, user)
+}
+
+// UpdateUser handles updating an existing user
+func UpdateUser(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		helper.GenerateErrorResponse(w, helper.INVALID_FIELD_FORMAT, "Invalid ID format", nil)
+		return
+	}
+
+	var userInput models.User
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&userInput); err != nil {
+		helper.GenerateErrorResponse(w, helper.INVALID_FIELD_FORMAT, err.Error(), nil)
+		return
+	}
+	defer r.Body.Close()
+
+	var user models.User
+	if err := models.DB.First(&user, id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			helper.GenerateErrorResponse(w, helper.SERVER_GENERAL_ERROR, "User not found", nil)
+			return
+		}
+		helper.GenerateErrorResponse(w, helper.SERVER_GENERAL_ERROR, err.Error(), nil)
+		return
+	}
+
+	user.NamaLengkap = userInput.NamaLengkap
+	user.Username = userInput.Username
+	if userInput.Password != "" {
+		hashPassword, _ := bcrypt.GenerateFromPassword([]byte(userInput.Password), bcrypt.DefaultCost)
+		user.Password = string(hashPassword)
+	}
+
+	if err := models.DB.Save(&user).Error; err != nil {
+		helper.GenerateErrorResponse(w, helper.SERVER_GENERAL_ERROR, err.Error(), nil)
+		return
+	}
+
+	helper.GenerateResponse(w, helper.OK, user)
+}
+
+// DeleteUser handles deleting a user by ID
+func DeleteUser(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		helper.GenerateErrorResponse(w, helper.INVALID_FIELD_FORMAT, "Invalid ID format", nil)
+		return
+	}
+
+	if err := models.DB.Delete(&models.User{}, id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			helper.GenerateErrorResponse(w, helper.SERVER_GENERAL_ERROR, "User not found", nil)
+			return
+		}
+		helper.GenerateErrorResponse(w, helper.SERVER_GENERAL_ERROR, err.Error(), nil)
+		return
+	}
+
+	helper.GenerateResponse(w, helper.OK, nil)
 }

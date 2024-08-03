@@ -12,6 +12,7 @@ import (
 
 var DB *gorm.DB
 
+// ConnectDatabase initializes the database connection and performs auto-migration
 func ConnectDatabase() {
 	// Load environment variables from .env file
 	if err := godotenv.Load(); err != nil {
@@ -24,14 +25,21 @@ func ConnectDatabase() {
 	dbPort := os.Getenv("DB_PORT")
 	dbName := os.Getenv("DB_NAME")
 
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s", dbUsername, dbPassword, dbHost, dbPort, dbName)
+	// Format the DSN (Data Source Name) string
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local", dbUsername, dbPassword, dbHost, dbPort, dbName)
+
+	// Open the database connection
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Fatal("Gagal koneksi database: ", err)
+		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	db.AutoMigrate(&User{})
+	// Perform auto-migration for all models
+	if err := db.AutoMigrate(&User{}, &SecurityAsymmetricKey{}); err != nil {
+		log.Fatalf("Failed to migrate database schema: %v", err)
+	}
 
+	// Assign the DB connection to the global variable
 	DB = db
-	fmt.Println("Database connection established")
+	log.Println("Database connection established")
 }
