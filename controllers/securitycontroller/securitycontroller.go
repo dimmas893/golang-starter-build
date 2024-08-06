@@ -38,7 +38,7 @@ func GenerateAccessTokenHandler(w http.ResponseWriter, r *http.Request) {
 func GenerateAsymmetricKeyHandler(w http.ResponseWriter, r *http.Request) {
 	privateKey, publicKey, err := helper.GenerateAsymmetricKey()
 	if err != nil {
-		helper.GenerateErrorResponse(w, helper.SERVER_GENERAL_ERROR, "Failed to generate keys", nil)
+		helper.GenerateErrorResponse(w, helper.SERVER_GENERAL_ERROR, "Failed to generate keys: "+err.Error(), nil)
 		return
 	}
 
@@ -47,21 +47,21 @@ func GenerateAsymmetricKeyHandler(w http.ResponseWriter, r *http.Request) {
 	// Generate a random 20-character secret key
 	secretKey, err := helper.GenerateRandomString(20)
 	if err != nil {
-		helper.GenerateErrorResponse(w, helper.SERVER_GENERAL_ERROR, "Failed to generate secret key", nil)
+		helper.GenerateErrorResponse(w, helper.SERVER_GENERAL_ERROR, "Failed to generate secret key: "+err.Error(), nil)
 		return
 	}
 
 	// Perform double encryption on the secret key
 	encryptedSecretKey, err := helper.DoubleEncryptString(secretKey)
 	if err != nil {
-		helper.GenerateErrorResponse(w, helper.SERVER_GENERAL_ERROR, "Failed to encrypt secret key", nil)
+		helper.GenerateErrorResponse(w, helper.SERVER_GENERAL_ERROR, "Failed to encrypt secret key: "+err.Error(), nil)
 		return
 	}
 
 	// Save the credentials to the database and file system
 	err = helper.SaveCredentials(apiKey, privateKey, publicKey, secretKey)
 	if err != nil {
-		helper.GenerateErrorResponse(w, helper.SERVER_GENERAL_ERROR, "Failed to save credentials", nil)
+		helper.GenerateErrorResponse(w, helper.SERVER_GENERAL_ERROR, "Failed to save credentials: "+err.Error(), nil)
 		return
 	}
 
@@ -80,7 +80,7 @@ func GenerateAsymmetricKeyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := models.DB.Create(&securityKey).Error; err != nil {
-		helper.GenerateErrorResponse(w, helper.SERVER_GENERAL_ERROR, "Failed to save credentials to database", nil)
+		helper.GenerateErrorResponse(w, helper.SERVER_GENERAL_ERROR, "Failed to save credentials to database: "+err.Error(), nil)
 		return
 	}
 

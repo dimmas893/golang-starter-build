@@ -71,11 +71,12 @@ func DoubleEncryptString(plaintext string) (string, error) {
 }
 
 // SaveCredentials saves the credentials to files in a directory named after the API key
+// SaveCredentials saves the credentials to files in a directory named after the API key
 func SaveCredentials(apiKey, privateKey, publicKey, secret string) error {
 	// Create the directory for storing credentials
 	dirPath := filepath.Join("logs", "credentials", apiKey)
 	if err := os.MkdirAll(dirPath, os.ModePerm); err != nil {
-		return err
+		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
 	privateKeyPath := filepath.Join(dirPath, "private.key")
@@ -84,22 +85,22 @@ func SaveCredentials(apiKey, privateKey, publicKey, secret string) error {
 
 	hashedSecret, err := bcrypt.GenerateFromPassword([]byte(secret), bcrypt.DefaultCost)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to hash secret: %w", err)
 	}
 
 	err = SaveKeyToFile(privateKey, privateKeyPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to save private key: %w", err)
 	}
 
 	err = SaveKeyToFile(publicKey, publicKeyPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to save public key: %w", err)
 	}
 
 	err = SaveKeyToFile(string(hashedSecret), secretKeyPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to save secret key: %w", err)
 	}
 
 	return nil
